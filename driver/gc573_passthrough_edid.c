@@ -53,8 +53,7 @@ static unsigned int vic_clock(unsigned int vic)
 		return 0;
 	}
 }
-static int dtd_allowed(const unsigned char *d, unsigned int max, unsigned int scaled,
-    unsigned int experimental_144hz)
+static int dtd_allowed(const unsigned char *d, unsigned int max, unsigned int scaled)
 {
 	unsigned int khz = (d[0] + 256U * d[1]) * 10, w = d[2] + ((d[4] & 0xf0) << 4),
 		     h = d[5] + ((d[7] & 0xf0) << 4), ht = w + d[3] + ((d[4] & 15) << 8),
@@ -68,14 +67,12 @@ static int dtd_allowed(const unsigned char *d, unsigned int max, unsigned int sc
 					 : 0;
 	if (scaled) {
 		if (w > 2560 || h > 1440) return 0;
-		limit = w == 1280 ? 60 :
-			w == 2560 && h == 1440 && experimental_144hz ? 144 : 120;
+		limit = w == 1280 ? 60 : 120;
 	}
 	return limit && (unsigned long long)khz * 1000 <= (unsigned long long)limit * ht * vt;
 }
 static int build_edid(const unsigned char *data, unsigned int length,
-			   struct gc573_passthrough_edid *out, unsigned int scaled,
-			   unsigned int experimental_144hz)
+			   struct gc573_passthrough_edid *out, unsigned int scaled)
 {
 	static const unsigned char header[] = {0, 255, 255, 255, 255, 255, 255, 0};
 	unsigned char vics[32] = {0}, dtds[6][18] = {{0}};
@@ -149,7 +146,7 @@ static int build_edid(const unsigned char *data, unsigned int length,
 			continue;
 		end = b ? 127 : 126;
 		for (; i + 18 <= end; i += 18) {
-			if (nd < 6 && dtd_allowed(data + b + i, out->max_tmds_khz, scaled, experimental_144hz))
+			if (nd < 6 && dtd_allowed(data + b + i, out->max_tmds_khz, scaled))
 				copy(dtds[nd++], data + b + i, 18);
 		}
 	}
@@ -257,10 +254,7 @@ void gc573_capture_edid(unsigned char out[256])
 
 int gc573_passthrough_edid(const unsigned char *data, unsigned int length,
     struct gc573_passthrough_edid *out)
-{ return build_edid(data, length, out, 0, 0); }
+{ return build_edid(data, length, out, 0); }
 int gc573_scaled_edid(const unsigned char *data, unsigned int length,
     struct gc573_passthrough_edid *out)
-{ return build_edid(data, length, out, 1, 0); }
-int gc573_scaled_edid_profile(const unsigned char *data, unsigned int length,
-    struct gc573_passthrough_edid *out, unsigned int experimental_144hz)
-{ return build_edid(data, length, out, 1, experimental_144hz); }
+{ return build_edid(data, length, out, 1); }

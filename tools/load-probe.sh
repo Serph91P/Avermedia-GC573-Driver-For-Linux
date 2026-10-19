@@ -68,6 +68,7 @@ case ${1:-} in
     --start-passthrough) identity_read=1; auto_start=1; auto_passthrough=1; shift ;;
     --scaled-video) identity_read=1; video_capture=1; scaled_capture=1; shift ;;
     --scaled-video-144hz) identity_read=1; video_capture=1; scaled_capture=1; experimental_144hz=1; experimental_parameters=(experimental_144hz=1); shift ;;
+    --capture-wait-144hz) identity_read=1; video_capture=1; scaled_capture=1; hdmi_deferred=1; experimental_144hz=1; experimental_parameters=(experimental_144hz=1); shift ;;
     --passthrough-video) identity_read=1; video_capture=1; passthrough_only=1; shift ;;
     --sink-edid) identity_read=1; sink_read=1; shift ;;
     --start) identity_read=1; auto_start=1; shift ;;
@@ -522,6 +523,9 @@ if [[ "$hdmi_deferred" == 1 ]]; then
     parameters=$(modinfo -p "$module")
     [[ "$parameters" == *"hdmi_start_phase:"* ]] || { echo 'Rebuild for deferred HDMI startup.' >&2; exit 1; }
     hdmi_phase=$(python3 "$project_dir/tools/start-capture.py" --handoff-phase "$bdf")
+    if [[ "$experimental_144hz" == 1 && "$hdmi_phase" != 6 ]]; then
+        echo 'Experimental input requires the checked phase6 cold handoff.' >&2; exit 1
+    fi
 fi
 modprobe snd-pcm
 modprobe videodev

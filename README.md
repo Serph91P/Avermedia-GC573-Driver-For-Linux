@@ -111,36 +111,39 @@ The preview works in **capture** and **scaled** modes with HDCP disabled. It
 shows HDMI input resolution/rate separately from preview resolution and its
 capture frame-rate limit. Passthrough-only mode does not provide host capture.
 
-## Opt-in 1440p144 input with capture capped at 60 fps
+## Opt-in input-only 1440p144 with capture capped at 60 fps
 
-`experimental_144hz=1` extends only the combined `scaled_capture=1`
-video profile. It is **off by default** and requires `capture_video=1`.
-It accepts the existing lower-rate modes plus progressive 2560x1440 RGB8/SDR
-input around 144 Hz (143-145 Hz measured by the FPGA). Capture stays on the
-established paced path at **at most 60 fps**, including when an application
-requests 120 or 144 fps. Native 144-fps capture, HDR, YUV and 4K are not added.
-The existing PCIe bandwidth requirement for 1440p capture is unchanged.
+`experimental_144hz=1` is an explicit, **default-off** input-only profile.
+It requires `scaled_capture=1` and `capture_video=1`, but **does not require
+anything connected to HDMI OUT**. This is intended for a PC desktop mirrored
+to the capture card at 2560x1440 around 144 Hz. Capture remains paced at **at
+most 60 fps**, even when an application requests 120 or 144 fps.
 
-For an explicitly authorized temporary test, with no other driver bound:
+For an authorized temporary test on a cold, unbound card:
 
 ```bash
-sudo ./tools/load-probe.sh --scaled-video-144hz 0000:04:00.0
+sudo python3 ./tools/start-capture.py --experimental-144hz 0000:04:00.0
 ```
 
-Use the actual GC573 BDF for your machine. The loader retains its identity,
-binding, confirmation and module-capability checks. This option is not added
-to automatic startup or installation. The source and attached display must
-support the timing; the filtered EDID never invents an absent display mode.
-Without this option the existing 120-Hz input/120-fps native capture behavior
-is unchanged.
+Use the actual GC573 BDF. The checked cold prefix hands off at phase6; the
+worker finishes the resident-EDID/internal-link initialization through
+phase13, then uses the bounded TX1/receiver/FPGA profile rather than the
+restricted legacy phase14 output. Interrupted writing phases remain stopped.
+This option is not added to installation, automatic startup or saved modes.
 
-The explicit input profile bounds the internal HDMI path and the receiver's
-complete measured clock interval at 600 MHz instead of 510 MHz. It reuses the
-existing dual-TTL/DDR register sequence; it does not introduce a new register
-programming sequence. Synthetic protocol tests cover both clock limits,
-format rejection and high-clock link continuation. Those tests are not a
-144-Hz hardware/OBS proof: actual input lock, useful video, capture rate and
-cleanup still require a bounded device test.
+The resident input EDID is retained, not replaced with a connected monitor's
+EDID or a forced 1080p profile. Source display/mirroring settings are not
+changed. The experimental path does not configure external TX2 output.
+Progressive RGB8/SDR, supported geometry, the receiver's complete clock
+interval <=600 MHz and FPGA timing (143-145 Hz for the added 1440p mode) gate
+readiness and capture. Native 144-fps capture, HDR, YUV and 4K are not added.
+The PCIe bandwidth requirement for 1440p capture is unchanged.
+
+Without the opt-in, legacy input/capture/passthrough behavior is unchanged.
+The explicit input profile reuses the existing dual-TTL/DDR register sequence;
+it does not introduce new register programming tables. Synthetic protocol and
+component tests are not a hardware/OBS proof: useful video, rate and cleanup
+still require a bounded device test.
 
 ## Experimental native 1440p120 capture (0.46.1)
 

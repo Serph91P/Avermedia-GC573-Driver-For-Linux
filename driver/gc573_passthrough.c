@@ -301,8 +301,7 @@ int gc573_passthrough_poll(const struct gc573_block_io *io, struct gc573_passthr
 		if (ret == -ENOLINK && !p->sink.writes)
 			ret = -EAGAIN;
 		if (!ret)
-			ret = p->scaled ? gc573_scaled_edid_profile(p->sink.edid, p->sink.bytes,
-				&p->advertised, p->experimental_144hz) :
+			ret = p->scaled ? gc573_scaled_edid(p->sink.edid, p->sink.bytes, &p->advertised) :
 				gc573_passthrough_edid(p->sink.edid, p->sink.bytes, &p->advertised);
 		break;
 	case 1:

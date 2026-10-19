@@ -368,18 +368,21 @@ static int gc573_combined_poll(struct gc573_device *card)
 	int ret;
 
 	if (card->combined_error) return card->combined_error;
-	ret = gc573_passthrough_poll(io, p);
-	if (ret) goto fail;
-	/* TX2's monitor can stop asserting RxSense while the PS5 and internal
-	 * receiver remain active. Capture follows the stable input, not TX2.
-	 */
-	if (!p->stable || p->format_rejected || card->combined_changes != p->changes) {
-		smp_store_release(&card->hdmi_ready, false);
-		card->combined_phase = 0;
-		h->video.waiting_link = 0;
-		card->combined_changes = p->changes;
+	if (!experimental_144hz) {
+		ret = gc573_passthrough_poll(io, p);
+		if (ret) goto fail;
+		/* Legacy combined mode follows its external monitor's EDID/state. */
+		if (!p->stable || p->format_rejected || card->combined_changes != p->changes) {
+			smp_store_release(&card->hdmi_ready, false);
+			card->combined_phase = 0;
+			h->video.waiting_link = 0;
+			card->combined_changes = p->changes;
+		}
+		if (!p->stable || p->format_rejected) return 0;
 	}
-	if (!p->stable || p->format_rejected) return 0;
+	/* The opt-in input-only profile keeps the resident EDID. HDMI OUT/TX2
+	 * need not have a monitor; fresh TX1/receiver/FPGA checks gate capture.
+	 */
 	switch (card->combined_phase) {
 	case 0:
 		ret = gc573_splitter_video_internal_profile(io, &h->identity, &h->link,
@@ -450,6 +453,8 @@ static int gc573_combined_poll(struct gc573_device *card)
 		if (!(io->read(io->ctx, 0x1004) & 1) ||
 		    gc573_input_pixels(io->read(io->ctx, 0x1008), packing) != h->receiver_video.width ||
 		    io->read(io->ctx, 0x100c) != h->receiver_video.height ||
+		    (experimental_144hz && !gc573_input_period_supported(
+			h->receiver_video.width, h->receiver_video.height, period, 1)) ||
 		    period < card->combined_period * 9 / 10 ||
 		    period > card->combined_period * 11 / 10) {
 			smp_store_release(&card->hdmi_ready, false);
@@ -472,7 +477,10 @@ static void gc573_hdmi_work(struct work_struct *work)
 	int ret;
 	if (scaled_capture) {
 		gc573_control_lock(card);
-		ret = gc573_combined_poll(card);
+		ret = experimental_144hz && hdmi_start_phase ?
+			gc573_hdmi_prepare_capture(&card->hdmi_io, &card->hdmi) : 1;
+		if (ret == 1)
+			ret = gc573_combined_poll(card);
 		gc573_control_unlock(card);
 		if (ret) {
 			pr_err("gc573_native: scaled capture phase %u stopped: %d\n", card->combined_phase, ret);
@@ -1567,9 +1575,11 @@ static int gc573_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	unsigned int i;
 	int ret;
 
-	if (experimental_144hz && (!scaled_capture || !capture_video))
+	if (experimental_144hz && (!scaled_capture || !capture_video ||
+	    (hdmi_start_phase && hdmi_start_phase != GC573_HDMI_FIRST)))
 		return -EINVAL;
-	if ((passthrough_only || scaled_capture) && (!capture_video || hdmi_start_phase ||
+	if ((passthrough_only || scaled_capture) && (!capture_video ||
+	    (hdmi_start_phase && !experimental_144hz) ||
 	    (passthrough_only && scaled_capture)))
 		return -EINVAL;
 	if (hdmi_start_phase && (!capture_video || hdmi_start_phase < GC573_HDMI_FIRST ||
@@ -1610,7 +1620,6 @@ static int gc573_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	card->initial_command = command;
 	mutex_init(&card->control_mutex);
 	card->external.scaled = scaled_capture;
-	card->external.experimental_144hz = experimental_144hz;
 
 	ret = pci_enable_device_mem(pdev);
 	if (ret)
