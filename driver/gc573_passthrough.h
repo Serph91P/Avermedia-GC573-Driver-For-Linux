@@ -10,7 +10,7 @@ int gc573_passthrough_edid(const unsigned char *data, unsigned int length,
 			   struct gc573_passthrough_edid *out);
 struct gc573_passthrough_state {
 	unsigned int phase, polls, waiting, active, changes, width, height, millihz;
-	unsigned int scaled, format_waits, format_rejected;
+	unsigned int scaled, experimental_144hz, format_waits, format_rejected;
 	unsigned int edid_written, edid_verified, bank_verified, bank, writes;
 	unsigned int snapshot_valid, stable, configured, prior_valid, scdc_status,
 	    scdc_status_valid, sink_lock;
@@ -38,9 +38,14 @@ int gc573_passthrough_restore(const struct gc573_block_io *io, struct gc573_pass
 void gc573_capture_edid(unsigned char out[256]);
 int gc573_scaled_edid(const unsigned char *data, unsigned int length,
     struct gc573_passthrough_edid *out);
+int gc573_scaled_edid_profile(const unsigned char *data, unsigned int length,
+    struct gc573_passthrough_edid *out, unsigned int experimental_144hz);
 int gc573_splitter_video_internal(const struct gc573_block_io *io,
     struct gc573_splitter_result *identity, struct gc573_splitter_link_result *link,
     struct gc573_splitter_video_result *r);
+int gc573_splitter_video_internal_profile(const struct gc573_block_io *io,
+    struct gc573_splitter_result *identity, struct gc573_splitter_link_result *link,
+    struct gc573_splitter_video_result *r, unsigned int experimental_144hz);
 int gc573_splitter_video_format_wait(const struct gc573_splitter_video_result *r, int error);
 int gc573_splitter_video_link_wait(const struct gc573_splitter_video_result *r, int error);
 int gc573_splitter_video_resume(const struct gc573_block_io *io,
