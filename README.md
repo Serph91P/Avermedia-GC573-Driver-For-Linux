@@ -49,6 +49,7 @@ Those are **card specifications**, not features already working in this driver.
 | 1080p60 video | Hardware verified in OBS; RGB 8-bit HDMI input → V4L2 BGR24 |
 | 720p and lower-rate 1080p | Bounded support implemented; additional source modes need hardware validation |
 | Native 1440p120 capture | 0.46.1 fixes the FPGA’s 60 fps timer cap; a 30-second 119.89 Hz test delivered 119.87 fps on Gen2 ×4; transition/motion validation remains pending |
+| Opt-in HDMI-IN-only 1440p144 input | Mirrored 2560x1440 at 143.897 Hz, HDMI OUT free, captured in native OBS as 1080p60; bounded five-second video-only test; see below |
 | 4K capture / 1440p144 capture / HDR | Not implemented |
 | Hardware scaling | 1440p119.89 input → 1080p60 capture, 1440p59.94 → 1080p59.94, and 1080p → 720p verified |
 | 1440p120 HDMI OUT + 1080p60 capture | Verified on a PS5 in 0.45.3: 119.89 Hz input, 60 fps capture, nonzero audio; user confirms 120 Hz output |
@@ -141,9 +142,19 @@ The PCIe bandwidth requirement for 1440p capture is unchanged.
 
 Without the opt-in, legacy input/capture/passthrough behavior is unchanged.
 The explicit input profile reuses the existing dual-TTL/DDR register sequence;
-it does not introduce new register programming tables. Synthetic protocol and
-component tests are not a hardware/OBS proof: useful video, rate and cleanup
-still require a bounded device test.
+it does not introduce new register programming tables.
+
+A bounded native hardware test on CachyOS kernel `7.2.11-1-cachyos` verified
+mirrored 2560x1440 input at 143.897 Hz with HDMI OUT unconnected. OBS 32.2.2
+captured 1920x1080 BGR24 at 60 fps: 301 encoded frames over about 5.017 seconds,
+321 returned capture frames/interrupts, and a visually checked useful desktop
+image. Capture/HDMI errors stayed zero; audio DMA stayed off in all 124 status
+samples. Module unload, unbound PCI state, enable zero and busmaster off were
+read back after capture. Tested code commit: `d6c7903`.
+
+This is not a long-duration, source-mode-transition, native 1440p60-output or
+HDMI-OUT proof. The opt-in remains experimental and is not installed or
+enabled automatically. Private desktop footage is not included in the repo.
 
 ## Experimental native 1440p120 capture (0.46.1)
 
